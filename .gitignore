@@ -5,3 +5,4 @@
 .vscode/ipch
 *.yml
 *.json
+ESP32_FTPServer_SD/user_defaults.h
