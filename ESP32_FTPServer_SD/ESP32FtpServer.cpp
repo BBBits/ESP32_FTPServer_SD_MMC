@@ -17,22 +17,26 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//  2017: modified by @robo8080
+// 2017: modified by @robo8080
 // 2019: modified by @fa1ke5
+// 2020: modified by @bbbits
 
 #include "ESP32FtpServer.h"
 
 #include <WiFi.h>
-//#include <ESP32WebServer.h>
 #include <FS.h>
-#include "SD_MMC.h"
-//#include "SPI.h"
+#include <SD_MMC.h>
+#include <time.h>
 
 
 
 WiFiServer ftpServer( FTP_CTRL_PORT );
 WiFiServer dataServer( FTP_DATA_PORT_PASV );
 
+void FtpServer::begin(String uname, String pword, uint8_t DST_hrs_now,float Timezone ){
+   	configTime(3600*Timezone, DST_hrs_now*3600, "time.nist.gov", "0.pool.ntp.org", "1.pool.ntp.org"); 
+     begin(uname,pword);
+}
 void FtpServer::begin(String uname, String pword)
 {
   // Tells the ftp server to begin listening for incoming connection
@@ -213,7 +217,11 @@ boolean FtpServer::processCommand()
 
   //
   //  CDUP - Change to Parent Directory 
-  //
+  //  
+  time_t t;
+  struct tm * tmstruct;
+  //char dtStr[ 15 ];
+
   if( ! strcmp( command, "CDUP" ) || ( ! strcmp( command, "CWD" ) && ! strcmp( parameters, ".." )))
   {
 	 bool ok = false;
@@ -441,11 +449,22 @@ boolean FtpServer::processCommand()
           Serial.println("File Name = "+ fn);
           #endif
           fs = String(file.size());
+          t= file.getLastWrite();
+
+          tmstruct = gmtime(&t);
+
           if(file.isDirectory()){
-            data.println( "01-01-2000  00:00AM <DIR> " + fn);
+             data.printf("%02d-%02d-%04d  %02d:%02d <DIR> %s\n", 
+             ( tmstruct->tm_mon)+1,tmstruct->tm_mday,(tmstruct->tm_year)+1900,
+             tmstruct->tm_hour , tmstruct->tm_min,
+             fn.c_str());
+            
           } else {
-            data.println( "01-01-2000  00:00AM " + fs + " " + fn);
-//          data.println( " " + fn );
+             data.printf("%02d-%02d-%04d  %02d:%02d %s %s\n", 
+             ( tmstruct->tm_mon)+1,tmstruct->tm_mday,(tmstruct->tm_year)+1900,
+             tmstruct->tm_hour , tmstruct->tm_min, 
+             fs.c_str(),fn.c_str());
+             
           }
           nm ++;
           file = dir.openNextFile();
@@ -472,35 +491,36 @@ boolean FtpServer::processCommand()
     {
 	  client.println( "150 Accepted data connection");
       uint16_t nm = 0;
-//      Dir dir= SD.openDir(cwdName);
       File dir= SD_MMC.open(cwdName);
-      char dtStr[ 15 ];
-    //  if(!SD.exists(cwdName))
      if((!dir)||(!dir.isDirectory()))
-        client.println( "550 Can't open directory " +String(cwdName) );
-//        client.println( "550 Can't open directory " +String(parameters) );
+        client.println( "550 Can't open directory \"" +String(cwdName) +"\"");
       else
       {
-//        while( dir.next())
         File file = dir.openNextFile();
-//        while( dir.openNextFile())
         while( file)
     		{
         
     			String fn,fs;
           fn = file.name();
-          int pos = fn.lastIndexOf("/"); //ищем начало файла по последнему "/"
-          fn.remove(0, pos+1); //Удаляем все до имени файла включительно
+          int pos = fn.lastIndexOf("/"); 
+          fn.remove(0, pos+1); 
           fs = String(file.size());
+          t= file.getLastWrite();
+          tmstruct = gmtime(&t);
+ //         sprintf(dtStr,"%04d%02d%02d%02d%02d%02d",(tmstruct->tm_year)+1900,( tmstruct->tm_mon)+1, tmstruct->tm_mday,tmstruct->tm_hour , tmstruct->tm_min, tmstruct->tm_sec);
+
           if(file.isDirectory()){
-	  
-	      data.println(fn);
-//            data.println( "Type=dir;Size=" + fs + ";"+"modify=20000101000000;" +" " + fn);
-//            data.println( "Type=dir;modify=20000101000000; " + fn);
+            
+                data.printf("Type=dir;modify=%04d%02d%02d%02d%02d%02d; %s\n",
+                  (tmstruct->tm_year)+1900,( tmstruct->tm_mon)+1, 
+                  tmstruct->tm_mday,tmstruct->tm_hour , tmstruct->tm_min, tmstruct->tm_sec,
+                  fn.c_str());
           } else {
-	      data.println( fs + " " + fn);
-            //data.println( "Type=file;Size=" + fs + ";"+"modify=20000101160656;" +" " + fn);
-            //data.println( "Type=file;Size=" + fs + ";"+"modify=20000101000000;" +" " + fn);
+            
+                data.printf("Type=file;Size=%s;modify=%04d%02d%02d%02d%02d%02d; %s\n",
+                  fs.c_str(),(tmstruct->tm_year)+1900,( tmstruct->tm_mon)+1, 
+                  tmstruct->tm_mday,tmstruct->tm_hour , tmstruct->tm_min, tmstruct->tm_sec,
+                  fn.c_str());   
 	      
           }
           nm ++;
@@ -526,7 +546,7 @@ boolean FtpServer::processCommand()
 //      Dir dir=SD.openDir(cwdName);
       File dir= SD_MMC.open(cwdName);
       if( !SD_MMC.exists( cwdName ))
-        client.println( "550 Can't open directory " + String(parameters));
+        client.println( "550 Can't open directory \"" + String(parameters)+"\"");
       else
       {
           File file = dir.openNextFile();
@@ -563,9 +583,9 @@ boolean FtpServer::processCommand()
 	{
 		file = SD_MMC.open(path, "r");
       if( !file)
-        client.println( "550 File " +String(parameters)+ " not found");
+        client.println( "550 File \"" +String(parameters)+ "\" not found");
       else if( !file )
-        client.println( "450 Can't open " +String(parameters));
+        client.println( "450 Can't open \"" +String(parameters)+"\"");
       else if( ! dataConnect())
         client.println( "425 No data connection");
       else
@@ -593,7 +613,7 @@ boolean FtpServer::processCommand()
     {
 		file = SD_MMC.open(path, "w");
       if( !file)
-        client.println( "451 Can't open/create " +String(parameters) );
+        client.println( "451 Can't open/create \"" +String(parameters)+"\"" );
       else if( ! dataConnect())
       {
         client.println( "425 No data connection");
@@ -620,7 +640,7 @@ boolean FtpServer::processCommand()
      char path[ FTP_CWD_SIZE ];
      if( haveParameter() && makePath( path )){
       if (SD_MMC.exists( path )){
-        client.println( "521 Can't create \"" + String(parameters) + ", Directory exists");
+        client.println( "521 Can't create \"" + String(parameters) + "\", Directory exists");
         }
         else
         {
@@ -628,7 +648,7 @@ boolean FtpServer::processCommand()
             client.println( "257 \"" + String(parameters) + "\" created");
             }
             else{
-              client.println( "550 Can't create \"" + String(parameters));
+              client.println( "550 Can't create \"" + String(parameters)+"\"");
               }
           }
       
@@ -668,7 +688,7 @@ boolean FtpServer::processCommand()
     else if( makePath( buf ))
     {
       if( ! SD_MMC.exists( buf ))
-        client.println( "550 File " +String(parameters)+ " not found");
+        client.println( "550 File \"" +String(parameters)+ "\" not found");
       else
       {
         #ifdef FTP_DEBUG

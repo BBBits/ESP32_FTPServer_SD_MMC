@@ -1,10 +1,16 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include "ESP32FtpServer.h"
+#include "user_defaults.h"
 
-const char* ssid = "*********************";
-const char* password = "*********************";
-
+// user_defaults.h should be ignored by git
+//#ifndef USER_DEFAULTS_H
+//#define USER_DEFAULTS_H
+//const char* ssid = "***********";
+//const char* password = "***********";
+//long timezone = 12; 
+//byte daysavetime = 0;
+//#endif
 
 FtpServer ftpSrv;   //set #define FTP_DEBUG in ESP32FtpServer.h to see ftp verbose on serial
 
@@ -33,13 +39,14 @@ void setup(void){
   Serial.println(ssid);
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-
+	Serial.println("");
   /////FTP Setup, ensure SD is started before ftp;  /////////
   
   ////if (SD.begin( SD_CS, SPI, SDSPEED)) {
   if (SD_MMC.begin()) {
       Serial.println("SD opened!");
-      ftpSrv.begin("esp32","esp32");    //username, password for ftp.  set ports in ESP32FtpServer.h  (default 21, 50009 for PASV)
+      // added dst & timezone
+      ftpSrv.begin("esp32","esp32",daysavetime,timezone);    //username, password for ftp.  set ports in ESP32FtpServer.h  (default 21, 50009 for PASV)
   }    
 }
 

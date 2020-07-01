@@ -1,6 +1,6 @@
 
 /*
-*  FTP SERVER FOR ESP8266
+*  FTP SERVER FOR ESP8266 / ESP32
  * based on FTP Serveur for Arduino Due and Ethernet shield (W5100) or WIZ820io (W5200)
  * based on Jean-Michel Gallego's work
  * modified to work with esp8266 SPIFFS by David Paiva (david@nailbuster.com)
@@ -18,8 +18,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//  2017: modified by @robo8080
-//  2019: modified by @fa1ke5
+// 2017: modified by @robo8080
+// 2019: modified by @fa1ke5
+// 2020: modified by @bbbits
 
 /*******************************************************************************
  **                                                                            **
@@ -38,7 +39,7 @@
 #include <FS.h>
 #include <WiFiClient.h>
 
-#define FTP_SERVER_VERSION "FTP-2016-01-14"
+#define FTP_SERVER_VERSION "FTP-2020-07-01"
 
 #define FTP_CTRL_PORT    21          // Command port on wich server is listening  
 #define FTP_DATA_PORT_PASV 50009     // Data port in passive mode
@@ -56,6 +57,7 @@
 class FtpServer
 {
 public:
+  void    begin(String uname, String pword, uint8_t DST_hrs_now,float Timezone );
   void    begin(String uname, String pword);
   void    handleFTP();
 
